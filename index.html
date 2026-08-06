@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Proposta Digital - Casamentos</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/128/177/177129.png" type="image/jpeg">
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'story-gold': '#D4AF37',
+                        'story-dark': '#1A1A1A',
+                        'story-cream': '#FAF7F5',
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'sans-serif'],
+                        'serif': ['"Cormorant Garamond"', 'serif'],
+                    },
+                    animation: {
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'scale-in': 'scaleIn 0.5s ease-out forwards',
+                    },
+                    keyframes: {
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        scaleIn: {
+                            '0%': { transform: 'scale(0.95)', opacity: '0' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+            touch-action: none; /* Previne scroll no mobile para simular o app */
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Área do Story simulando um celular no Desktop */
+        .story-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 450px; /* Largura de celular */
+            margin: 0 auto;
+            background-color: #1A1A1A;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        @media (min-width: 451px) {
+            .story-container {
+                height: 90vh;
+                margin-top: 5vh;
+                border-radius: 20px;
+            }
+        }
+
+        .story-bg {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            transition: all 0.3s ease;
+        }
+
+        .story-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.8) 100%);
+        }
+
+        /* Barra de progresso do Story */
+        .progress-bar-container {
+            display: flex;
+            gap: 4px;
+            padding: 12px 10px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+        }
+
+        .progress-segment {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.3);
+            flex: 1;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            border-radius: 2px;
+            transform-origin: left;
+        }
+
+        /* Zonas de clique para voltar e avançar */
+        .click-zone {
+            position: absolute;
+            top: 60px;
+            bottom: 80px;
+            z-index: 40;
+        }
+        .click-zone-left { left: 0; width: 30%; }
+        .click-zone-right { right: 0; width: 70%; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // Ícones Lucide
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current) {
+                    iconRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
+                    lucide.createIcons({ root: iconRef.current });
+                    const svg = iconRef.current.querySelector('svg');
+                    if (svg) {
+                        svg.style.width = `${size}px`;
+                        svg.style.height = `${size}px`;
+                    }
+                }
+            }, [name, size]);
+            return <span ref={iconRef} className={`inline-flex items-center justify-center ${className}`}></span>;
+        };
+
+        // Dados dos Stories (Proposta Comercial)
+        const STORY_DURATION = 7000; // 7 segundos por story
+
+        const stories = [
+            {
+                id: 1,
+                bgImage: 'https://images.unsplash.com/photo-1519225421980-715cb0215aed?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center text-center px-6 animate-scale-in">
+                        <Icon name="gem" size={48} className="text-story-gold mx-auto mb-6 opacity-80" />
+                        <h1 className="font-serif text-4xl font-bold text-white mb-4 leading-tight">
+                            A Revolução para o seu <span className="text-story-gold italic">Grande Dia</span>
+                        </h1>
+                        <p className="text-gray-200 font-sans text-sm md:text-base leading-relaxed opacity-90">
+                            Uma solução tecnológica completa e exclusiva, criada para casais que desejam controle total, zero taxas e muita elegância.
+                        </p>
+                    </div>
+                )
+            },
+            {
+                id: 2,
+                bgImage: 'https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 animate-slide-up">
+                        <div className="bg-black/40 backdrop-blur-md p-6 rounded-2xl border border-white/10">
+                            <h2 className="font-serif text-3xl font-bold text-white mb-4">O Problema das Plataformas</h2>
+                            <p className="text-gray-300 font-sans text-sm mb-4">
+                                Plataformas genéricas (como iCasei) cobram mensalidades e retêm até <strong>5% do valor</strong> dos seus presentes.
+                            </p>
+                            <div className="h-px w-full bg-white/20 my-4"></div>
+                            <h3 className="font-serif text-2xl font-bold text-story-gold mb-2">A Nossa Solução</h3>
+                            <p className="text-white font-sans text-sm font-medium">
+                                Desenvolvemos uma Aplicação Web Privada onde o controle, o design e o dinheiro são <strong>100% seus</strong>, sem intermediários.
+                            </p>
+                        </div>
+                    </div>
+                )
+            },
+            {
+                id: 3,
+                bgImage: 'https://images.pexels.com/photos/36380132/pexels-photo-36380132/free-photo-of-local-encantador-para-casamento-ao-ar-livre-com-decoracao-rustica.jpeg?cs=tinysrgb&dpr=1&w=500',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 animate-slide-up">
+                        <h2 className="font-serif text-4xl font-bold text-white mb-8 text-center">Os 3 Pilares</h2>
+                        
+                        <div className="space-y-4">
+                            <div className="flex items-start gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm">
+                                <div className="p-2 bg-story-gold/20 rounded-full text-story-gold shrink-0"><Icon name="layout-template" size={20} /></div>
+                                <div>
+                                    <h4 className="text-white font-bold text-sm">Site do Casal</h4>
+                                    <p className="text-gray-300 text-xs mt-1">Página elegante com a vossa história, contagem regressiva e informações do evento.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm">
+                                <div className="p-2 bg-story-gold/20 rounded-full text-story-gold shrink-0"><Icon name="gift" size={20} /></div>
+                                <div>
+                                    <h4 className="text-white font-bold text-sm">Loja & Sorteio (Zero Taxas)</h4>
+                                    <p className="text-gray-300 text-xs mt-1">Os convidados compram presentes virtuais. O valor cai via PIX direto na sua conta do Mercado Pago.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm">
+                                <div className="p-2 bg-story-gold/20 rounded-full text-story-gold shrink-0"><Icon name="lock" size={20} /></div>
+                                <div>
+                                    <h4 className="text-white font-bold text-sm">Painel de Gestão</h4>
+                                    <p className="text-gray-300 text-xs mt-1">Área exclusiva dos noivos para gerenciar vendas, realizar sorteios ao vivo e ver relatórios.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            },
+            {
+                id: 4,
+                bgImage: 'https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 animate-scale-in">
+                        <div className="text-center mb-6">
+                            <span className="text-story-gold font-bold tracking-widest text-xs uppercase bg-story-gold/20 px-3 py-1 rounded-full">Investimento</span>
+                        </div>
+                        <h2 className="font-serif text-4xl font-bold text-white mb-2 text-center">Opção 1</h2>
+                        <h3 className="font-serif text-2xl text-story-gold mb-6 text-center italic">Padrão Premium</h3>
+                        
+                        <div className="bg-black/50 backdrop-blur-md p-6 rounded-2xl border border-story-gold/30">
+                            <ul className="space-y-3 mb-6">
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="check" size={16} className="text-story-gold" /> Design elegante testado</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="check" size={16} className="text-story-gold" /> Suas fotos e história</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="check" size={16} className="text-story-gold" /> Cores personalizadas</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="check" size={16} className="text-story-gold" /> Hospedagem gratuita</li>
+                            </ul>
+                            <div className="text-center border-t border-white/20 pt-4">
+                                <p className="text-gray-400 text-xs mb-1">Prazo: 15 dias úteis</p>
+                                <p className="text-3xl font-bold text-white">R$ 1.000</p>
+                                <p className="text-story-gold text-xs font-bold mt-1 uppercase">Taxa Zero sobre os presentes</p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            },
+            {
+                id: 5,
+                bgImage: 'https://images.unsplash.com/photo-1544531585-9846b687d605?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 animate-scale-in">
+                        <div className="text-center mb-6">
+                            <span className="text-story-gold font-bold tracking-widest text-xs uppercase bg-story-gold/20 px-3 py-1 rounded-full">Investimento</span>
+                        </div>
+                        <h2 className="font-serif text-4xl font-bold text-white mb-2 text-center">Opção 2</h2>
+                        <h3 className="font-serif text-2xl text-story-gold mb-6 text-center italic">100% Personalizado</h3>
+                        
+                        <div className="bg-black/50 backdrop-blur-md p-6 rounded-2xl border border-story-gold/30">
+                            <ul className="space-y-3 mb-6">
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="star" size={16} className="text-story-gold" /> <strong>Tudo da Opção 1</strong></li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="pen-tool" size={16} className="text-story-gold" /> Design único do zero</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="fingerprint" size={16} className="text-story-gold" /> Baseado no seu monograma</li>
+                                <li className="flex items-center gap-3 text-sm text-gray-200"><Icon name="layers" size={16} className="text-story-gold" /> Até 3 Páginas Extras</li>
+                            </ul>
+                            <div className="text-center border-t border-white/20 pt-4">
+                                <p className="text-gray-400 text-xs mb-1">Prazo: 30 a 40 dias úteis</p>
+                                <p className="text-3xl font-bold text-white">R$ 2.000</p>
+                                <p className="text-story-gold text-xs font-bold mt-1 uppercase">Taxa Zero sobre os presentes</p>
+                            </div>
+                        </div>
+                    </div>
+                )
+            },
+            {
+                id: 6,
+                bgImage: 'https://images.unsplash.com/photo-1530103862676-de8892bc9524?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 animate-slide-up">
+                        <h2 className="font-serif text-4xl font-bold text-white mb-8 text-center">Serviços Extras</h2>
+                        
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm border-l-4 border-story-gold">
+                                <div className="flex-1">
+                                    <h4 className="text-white font-bold text-sm">Domínio Personalizado</h4>
+                                    <p className="text-gray-300 text-xs mt-1">ex: www.seunome.com.br</p>
+                                </div>
+                                <div className="text-story-gold font-bold">R$ 200</div>
+                            </div>
+                            <div className="flex items-center gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm border-l-4 border-story-gold">
+                                <div className="flex-1">
+                                    <h4 className="text-white font-bold text-sm">QR Code de Mesa</h4>
+                                    <p className="text-gray-300 text-xs mt-1">Para sorteio ao vivo na festa</p>
+                                </div>
+                                <div className="text-story-gold font-bold">R$ 150</div>
+                            </div>
+                            <div className="flex items-center gap-4 bg-white/10 p-4 rounded-xl backdrop-blur-sm border-l-4 border-story-gold">
+                                <div className="flex-1">
+                                    <h4 className="text-white font-bold text-sm">Suporte VIP no Dia</h4>
+                                    <p className="text-gray-300 text-xs mt-1">Estarei online no dia da festa</p>
+                                </div>
+                                <div className="text-story-gold font-bold">R$ 300</div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            },
+            {
+                id: 7,
+                bgImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1080&auto=format&fit=crop',
+                content: (
+                    <div className="flex flex-col h-full justify-center px-6 text-center animate-fade-in">
+                        <div className="bg-story-gold/90 backdrop-blur-md p-8 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(212,175,55,0.5)]">
+                            <Icon name="trending-up" size={40} className="text-white" />
+                        </div>
+                        <h2 className="font-serif text-4xl font-bold text-white mb-4">O Retorno do Investimento</h2>
+                        <p className="text-gray-200 font-sans text-base leading-relaxed mb-6">
+                            Numa plataforma comum, se arrecadar <strong>R$ 10.000</strong>, perderá até <strong>R$ 500</strong> só em taxas.<br/><br/>
+                            Com o nosso sistema, os R$ 10 mil são <strong>integralmente seus</strong>. A tecnologia se paga!
+                        </p>
+                        
+                        <div className="mt-8 animate-bounce">
+                            <p className="text-story-gold text-xs tracking-widest uppercase font-bold mb-2">Vamos conversar?</p>
+                            <Icon name="chevron-down" className="text-white mx-auto" />
+                        </div>
+                    </div>
+                ),
+                isLast: true
+            }
+        ];
+
+        const App = () => {
+            const [currentIndex, setCurrentIndex] = useState(0);
+            const [progress, setProgress] = useState(0);
+            const [isPaused, setIsPaused] = useState(false);
+            
+            const timerRef = useRef(null);
+            const startTimeRef = useRef(Date.now());
+            const pausedTimeRef = useRef(0);
+
+            // Controle de navegação
+            const nextStory = useCallback(() => {
+                if (currentIndex < stories.length - 1) {
+                    setCurrentIndex(prev => prev + 1);
+                    setProgress(0);
+                    startTimeRef.current = Date.now();
+                } else {
+                    // Chegou no final, mantém em 100%
+                    setProgress(100);
+                }
+            }, [currentIndex]);
+
+            const prevStory = useCallback(() => {
+                if (currentIndex > 0) {
+                    setCurrentIndex(prev => prev - 1);
+                    setProgress(0);
+                    startTimeRef.current = Date.now();
+                } else {
+                    // Reinicia o primeiro
+                    setProgress(0);
+                    startTimeRef.current = Date.now();
+                }
+            }, [currentIndex]);
+
+            // Motor da barra de progresso
+            useEffect(() => {
+                if (isPaused) {
+                    pausedTimeRef.current = Date.now();
+                    cancelAnimationFrame(timerRef.current);
+                    return;
+                }
+
+                // Ajusta o start time baseado no tempo que ficou pausado
+                if (pausedTimeRef.current > 0) {
+                    const pauseDuration = Date.now() - pausedTimeRef.current;
+                    startTimeRef.current += pauseDuration;
+                    pausedTimeRef.current = 0;
+                }
+
+                const updateProgress = () => {
+                    const elapsed = Date.now() - startTimeRef.current;
+                    const newProgress = (elapsed / STORY_DURATION) * 100;
+
+                    if (newProgress >= 100) {
+                        setProgress(100);
+                        nextStory();
+                    } else {
+                        setProgress(newProgress);
+                        timerRef.current = requestAnimationFrame(updateProgress);
+                    }
+                };
+
+                timerRef.current = requestAnimationFrame(updateProgress);
+
+                return () => cancelAnimationFrame(timerRef.current);
+            }, [currentIndex, isPaused, nextStory]);
+
+            // Eventos de Toque / Clique
+            const handleTouchStart = () => setIsPaused(true);
+            const handleTouchEnd = () => setIsPaused(false);
+
+            const handleZoneClick = (e, direction) => {
+                // Impede clique duplo acidental ou seleção
+                e.preventDefault(); 
+                
+                if (direction === 'left') {
+                    prevStory();
+                } else {
+                    nextStory();
+                }
+            };
+
+            const currentStory = stories[currentIndex];
+            const WHATSAPP_NUMBER = "5524998706460"; 
+            const WHATSAPP_MSG = "Olá, Gostaria de Contratar o app para meu casamento";
+
+            return (
+                <div className="story-container relative flex flex-col bg-story-dark">
+                    
+                    {/* Background com transição */}
+                    <div 
+                        className="story-bg"
+                        style={{ backgroundImage: `url(${currentStory.bgImage})` }}
+                    />
+                    <div className="story-overlay" />
+
+                    {/* Barra de Progresso */}
+                    <div className="progress-bar-container">
+                        {stories.map((s, i) => {
+                            let fillWidth = '0%';
+                            if (i < currentIndex) fillWidth = '100%';
+                            else if (i === currentIndex) fillWidth = `${progress}%`;
+
+                            return (
+                                <div key={s.id} className="progress-segment">
+                                    <div 
+                                        className="progress-fill" 
+                                        style={{ width: fillWidth }}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Cabeçalho do Perfil (Estilo Instagram) */}
+                    <div className="absolute top-6 left-0 right-0 z-50 flex items-center justify-between px-4 mt-2">
+                        <a href="https://ghazzaoui-dev.netlify.app/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 cursor-pointer group">
+                            <div className="w-8 h-8 rounded-full border border-white/50 overflow-hidden bg-story-dark flex items-center justify-center p-1">
+                                <img src="https://cdn-icons-png.flaticon.com/128/177/177129.png" alt="Logo" className="w-full h-full object-contain filter invert" />
+                            </div>
+                            <div className="flex flex-col shadow-sm group-hover:opacity-80 transition-opacity">
+                                <span className="text-white text-xs font-bold drop-shadow-md">RG7ech</span>
+                                <span className="text-white/80 text-[10px] drop-shadow-md">Proposta Comercial</span>
+                            </div>
+                        </a>
+                        <button className="text-white/80 hover:text-white" onClick={() => window.close()}>
+                            <Icon name="x" size={20} />
+                        </button>
+                    </div>
+
+                    {/* Conteúdo Central */}
+                    <div className="relative z-30 flex-1 flex flex-col pt-20 pb-24 pointer-events-none">
+                        {/* A key forçando re-render garante que as animações toquem novamente ao trocar de slide */}
+                        <div key={currentStory.id} className="flex-1 flex flex-col pointer-events-auto">
+                            {currentStory.content}
+                        </div>
+                    </div>
+
+                    {/* Zonas de Interação (invisíveis) */}
+                    <div 
+                        className="click-zone click-zone-left" 
+                        onPointerDown={handleTouchStart}
+                        onPointerUp={(e) => { handleTouchEnd(); handleZoneClick(e, 'left'); }}
+                        onContextMenu={(e) => e.preventDefault()}
+                    />
+                    <div 
+                        className="click-zone click-zone-right" 
+                        onPointerDown={handleTouchStart}
+                        onPointerUp={(e) => { handleTouchEnd(); handleZoneClick(e, 'right'); }}
+                        onContextMenu={(e) => e.preventDefault()}
+                    />
+
+                    {/* Rodapé / CTA */}
+                    <div className="absolute bottom-0 left-0 right-0 z-50 p-4 pb-8 bg-gradient-to-t from-black to-transparent flex justify-center">
+                        <a 
+                            href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(WHATSAPP_MSG)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full max-w-[280px] py-4 rounded-full bg-white text-story-dark text-sm font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors shadow-xl"
+                        >
+                            <Icon name="message-circle" size={18} />
+                            Falar no WhatsApp
+                        </a>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
